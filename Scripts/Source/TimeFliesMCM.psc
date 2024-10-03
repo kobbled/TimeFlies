@@ -70,6 +70,7 @@ Function initialize()
 		register_hotkey()
 		registerForKey(18)	;; listener for key that may activate crafting menu
 		registerForKey(276)
+        
 		_debug("Initialized")
     else
         unregisterForAllMenus()

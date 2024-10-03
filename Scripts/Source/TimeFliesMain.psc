@@ -308,6 +308,9 @@ Event OnVRButtonEvent(int buttonEvent, int buttonId, int deviceId)
 EndEvent
 
 Event OnKeyDown(int keycode)
+
+	_debug(" Keycode:  " + keycode)
+
 	if !is_enabled || is_paused
 		return
 	endif
@@ -328,12 +331,14 @@ Event OnKeyDown(int keycode)
 		in_city = False
 	endif
 	
+	; looting
 	if (keycode == 19 || keycode == 278) \
 		&& is_looting \
 		&& !Game.GetPlayer().IsInCombat()
 			_debug("Looting all from container")
 			take_all = True
 	
+	; fishing
 	elseif (keycode == 18 || keycode == 276) \
 		&& fishing_ae_pole \
 		&& !Game.GetPlayer().IsInCombat()
@@ -343,6 +348,7 @@ Event OnKeyDown(int keycode)
 			is_fishing = True
 		endif
 	
+	; inventory
 	elseif (keycode == 18 || keycode == 256 || keycode == 276) \
 		&& UI.isMenuOpen("InventoryMenu") \
 		&& !Game.GetPlayer().IsInCombat()
@@ -358,6 +364,7 @@ Event OnKeyDown(int keycode)
 			shovel = False
 		endif
 	
+	; crafting
 	elseif (keycode == 18 || keycode == 256 || keycode == 276) \
 		&& !(UI.isMenuOpen("Crafting Menu")) \
 		&& !(UI.isMenuOpen("Dialogue Menu")) \
@@ -453,6 +460,7 @@ Event OnMenuOpen(string menu)
 		registerForKey(18)
 		registerForKey(256)
 		registerForKey(278)
+
 		is_looting = False
 		is_trading = False
 		time_started = Utility.getCurrentRealTime()
@@ -572,7 +580,7 @@ Event OnMenuClose(string menu)
 		pass_time(t)
 		
 		uninit()
-		
+
 	elseif menu == "InventoryMenu"	
 		if eating_time_to_pass > 0.0
 			_debug("Eating from inventory")
