@@ -74,6 +74,8 @@ Function initialize()
     else
         unregisterForAllMenus()
     endif
+
+    main.init()
 	
 	;; Baseline iron crafting items
 	helm = Game.getFormFromFile(0x12e4d, "Skyrim.esm")

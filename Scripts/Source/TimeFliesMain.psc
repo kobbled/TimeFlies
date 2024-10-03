@@ -241,6 +241,71 @@ bool in_interior
 bool in_city
 bool fast_travel
 
+Function init()
+	PapyrusVR.RegisterForVRButtonEvents(self)
+	_debug(" VR Buttons initailized")
+EndFunction
+
+Function uninit()
+	PapyrusVR.UnRegisterForVRButtonEvents(self)
+	_debug(" VR Buttons uninitialized")
+EndFunction
+
+
+Event OnVRButtonEvent(int buttonEvent, int buttonId, int deviceId)
+	_debug("VR Keycode - device: " + deviceId + " button: " + buttonId + " event: " + buttonEvent)
+
+	if !is_enabled || is_paused
+		return
+	endif
+		
+	if Game.GetPlayer().IsInInterior()
+		in_interior = True
+	else 
+		in_interior = False
+	endif
+			
+	if Game.GetPlayer().IsInLocation(MarkarthLocation) \
+		|| Game.GetPlayer().IsInLocation(RiftenLocation) \
+		|| Game.GetPlayer().IsInLocation(SolitudeLocation) \
+		|| Game.GetPlayer().IsInLocation(WhiterunLocation) \
+		|| Game.GetPlayer().IsInLocation(WindhelmLocation)
+			in_city = True
+	else
+		in_city = False
+	endif
+	
+	; crafting
+	if ((buttonId == 33 || buttonId == 7)) \
+		&& !(UI.isMenuOpen("Dialogue Menu")) \
+		&& !Game.GetPlayer().IsInCombat()
+
+		    _debug("Wand: " + deviceId + " Button: " + buttonId)
+			_debug("Entering crafting menu")
+
+			activate_key_pressed = True
+			Utility.Wait(2.0) ;; wait for possible open menu
+			if UI.isMenuOpen("Crafting Menu") && furniture_using == None
+				_debug("Crafting via Menu")
+				is_crafting_menu = True
+				suppress_fullscreen = True
+			elseif !(Game.IsMovementControlsEnabled())
+				_debug("Possible fast travel")
+				fast_travel = True
+				game_time = Utility.GetCurrentGameTime()				
+				game_time_obtained = True
+				Utility.Wait(2.0) ;; wait for loot totals
+				GameTimeNotification()
+			else 
+				_debug("Not crafting or fast traveling")
+				is_crafting_menu = False
+				fast_travel = False
+				suppress_fullscreen = False
+			endif
+		
+	endif
+
+EndEvent
 
 Event OnKeyDown(int keycode)
 	if !is_enabled || is_paused
@@ -371,6 +436,7 @@ Event OnMenuOpen(string menu)
 		potion_mixed = Game.queryStat("Potions Mixed")
 		poison_mixed = Game.queryStat("Poisons Mixed")
 		unregisterForKey(37)
+		init()
 	
 	elseif menu == "Training Menu"
 		training_session = Game.queryStat("Training Sessions")
@@ -494,7 +560,9 @@ Event OnMenuClose(string menu)
 			time_stopped = Utility.getCurrentRealTime()
 			float time_passed = (time_stopped - time_started) * \
 				TimeScale.getValue() / 60 / 60 * trading_time_multiplier
-			pass_time(time_passed)														;; Trading	
+			pass_time(time_passed)
+			
+			uninit()														;; Trading	
 			return
 		endif
 		
@@ -502,6 +570,8 @@ Event OnMenuClose(string menu)
 			Transition()
 		endif	
 		pass_time(t)
+		
+		uninit()
 		
 	elseif menu == "InventoryMenu"	
 		if eating_time_to_pass > 0.0
