@@ -18,6 +18,10 @@ float stone_hatchet_crafting_minute
 int stone_hatchet_crafting_minute_id
 float stone_arrow_crafting_minute
 int stone_arrow_crafting_minute_id
+float fire_building_minute
+int fire_building_minute_id
+float tent_pitching_minute
+int tent_pitching_minute_id
 bool reclaiming_amulet
 bool reclaiming_backpack
 bool removing_bed_roll
@@ -30,12 +34,16 @@ Form[] small_tents
 Form[] large_tents
 Form[] tents_with_two_bed_rolls
 Form[] misc_items
+string item_name
+
 
 Function initialize()
-    prefix = main.get_prefix(Game.getFormFromFile(0x26bf1, "Campfire.esm"))
-    if prefix == -1
+    prefix = Game.getModByName("Campfire.esm")
+	if prefix == 255
+		main._debug("Campfire not installed " + prefix)
         return
     endif
+    main._debug("Campfire initialized " + prefix)	
 
     reclaiming_amulet = False
     reclaiming_backpack = False
@@ -72,7 +80,7 @@ Function initialize()
     tents_with_two_bed_rolls[2] = Game.getFormFromFile(0x624fb, "Campfire.esm")
     tents_with_two_bed_rolls[3] = Game.getFormFromFile(0x36b70, "Campfire.esm")
 
-    misc_items = new Form[5]
+    misc_items = new Form[4]
     misc_items[0] = Game.getFormFromFile(0x536e4, "Campfire.esm")
     misc_items[1] = Game.getFormFromFile(0x38680, "Campfire.esm")
     misc_items[2] = Game.getFormFromFile(0x36b4f, "Campfire.esm")
@@ -88,31 +96,50 @@ Function load_defaults()
     stone_hatchet_crafting_minute = 45.0
     stone_arrow_crafting_minute = 45.0
     misc_crafting_minute = 15.0
+	fire_building_minute = 15.0
+	tent_pitching_minute = 15.0
 EndFunction
 
 bool Function handle_added_item(Form item)
-    Armor a = item as Armor
+    if main.get_prefix(item) != prefix
+		return False
+    endif
+	
+	item_name = item.getName()
+	main._debug("Campfire Item - " + item_name)
+	
+	Armor a = item as Armor
     if a.isJewelry() && reclaiming_amulet
         reclaiming_amulet = False
         return True
     endif
-
-    if main.get_prefix(item) != prefix
-        return False
-    endif
+	
+	if item_name == "Build and Light Fire (Strike Stone)" \
+		|| item_name == "Roaring Campfire" \
+		|| item_name == "Replenish Fuel"
+			main._debug("Campfire made")
+			main.pass_time( \
+				fire_building_minute * main.random_time_multiplier() / 60)
+	endif
 
    if item == cooking_pot
         main._debug("Cooking pot made")
-        main.pass_time( \
-            cooking_pot_crafting_hour * main.random_time_multiplier())
+		if cooking_pot_crafting_hour >= main.transition_threshold
+			main.Transition()
+		endif
+        main.pass_time(cooking_pot_crafting_hour * \
+			main.random_time_multiplier() * \
+			self.main.expertise_multiplier("Smithing"))
     elseif item == stone_hatchet
         main._debug("Stone hatchet made")
-        main.pass_time( \
-            stone_hatchet_crafting_minute * main.random_time_multiplier() / 60)
+        main.pass_time(stone_hatchet_crafting_minute * \
+			main.random_time_multiplier() * \
+			self.main.expertise_multiplier("Smithing") / 60)
     elseif item == stone_arrow
         main._debug("Stone arrow made")
-        main.pass_time( \
-            stone_arrow_crafting_minute * main.random_time_multiplier() / 60)
+        main.pass_time(stone_arrow_crafting_minute * \
+			main.random_time_multiplier() * \
+			self.main.expertise_multiplier("Smithing") / 60)
     elseif backpacks.find(item) > -1
         if reclaiming_backpack
             reclaiming_backpack = False
@@ -123,6 +150,9 @@ bool Function handle_added_item(Form item)
         endif
     elseif cloaks.find(item) > -1
         main._debug("Cloak made")
+		if main.clothes_crafting_hour >= main.transition_threshold
+			main.Transition()
+		endif
         main.pass_time( \
             main.clothes_crafting_hour * main.random_time_multiplier())
     elseif small_tents.find(item) > -1
@@ -130,6 +160,9 @@ bool Function handle_added_item(Form item)
             removing_bed_roll = False
         else
             main._debug("Small tent made")
+		if small_tent_crafting_hour >= main.transition_threshold
+			main.Transition()
+		endif
             main.pass_time( \
                 small_tent_crafting_hour * main.random_time_multiplier())
         endif
@@ -138,22 +171,35 @@ bool Function handle_added_item(Form item)
             removing_bed_roll = False
         else
             main._debug("Large tent made")
+		if large_tent_crafting_hour >= main.transition_threshold
+			main.Transition()
+		endif
             main.pass_time( \
                 large_tent_crafting_hour * main.random_time_multiplier())
         endif
     elseif misc_items.find(item) > -1
         main._debug("Campfire misc item made")
         main.pass_time( \
-            misc_crafting_minute * main.random_time_multiplier() / 60)
+            misc_crafting_minute * \
+				main.random_time_multiplier() * \
+				self.main.expertise_multiplier("Smithing") / 60)
     else
-        main._debug("Campfire misc item ignored")
+        main._debug("Campfire irrelevant item ignored")
     endif
     return True
 EndFunction
 
 bool Function handle_removed_item(Form item)
-    int id = item.getFormID() - Math.leftShift(prefix, 24)
-    if tents_with_two_bed_rolls.find(item) > -1
+	int id = item.getFormID() - Math.leftShift(prefix, 24)
+	if main.get_prefix(item) != prefix
+		return False
+	elseif (small_tents.find(item) > -1 || large_tents.find(item) > -1 || tents_with_two_bed_rolls.find(item) > -1) \
+		&& !(UI.IsMenuOpen("InventoryMenu") || UI.IsMenuOpen("ContainerMenu") || UI.IsMenuOpen("BarterMenu") || UI.IsMenuOpen("Crafting Menu"))
+		main._debug("Pitched tent")
+		main.pass_time( \
+            tent_pitching_minute * main.random_time_multiplier() / 60)
+		return True
+    elseif tents_with_two_bed_rolls.find(item) > -1
         main._debug("Removing bed roll")
         removing_bed_roll = True
         return True
@@ -181,6 +227,8 @@ Function save_settings()
     mcm.fiss.saveFloat("campfire_stone_arrow_crafting_minute", \
         stone_arrow_crafting_minute)
     mcm.fiss.saveFloat("campfire_misc_crafting_minute", misc_crafting_minute)
+	mcm.fiss.saveFloat("campfire_fire_building_minute", fire_building_minute)
+	mcm.fiss.saveFloat("tent_pitching_minute", tent_pitching_minute)
 EndFunction
 
 Function load_settings()
@@ -197,6 +245,8 @@ Function load_settings()
     stone_arrow_crafting_minute = \
         mcm.fiss.loadFloat("campfire_stone_arrow_crafting_minute")
     misc_crafting_minute = mcm.fiss.loadFloat("campfire_misc_crafting_minute")
+	fire_building_minute = mcm.fiss.loadFloat("campfire_fire_building_minute")	
+	tent_pitching_minute = mcm.fiss.loadFloat("tent_pitching_minute")	
 EndFunction
 
 bool Function handle_page(string page)
@@ -204,12 +254,12 @@ bool Function handle_page(string page)
         return False
     endif
 
-    if prefix == -1
+    if prefix == 255
         mcm.addTextOption("", "$campfire_not_installed")
     else
-        mcm.setCursorFillMode(mcm.TOP_TO_BOTTOM)
-        mcm.addHeaderOption("$options")
-        small_tent_crafting_hour_id = mcm.addSliderOption( \
+        mcm.setCursorFillMode(mcm.TOP_TO_BOTTOM)		
+        mcm.addHeaderOption("$crafting")
+		small_tent_crafting_hour_id = mcm.addSliderOption( \
             "$campfire_small_tent", small_tent_crafting_hour, "${2}hour")
         large_tent_crafting_hour_id = mcm.addSliderOption( \
             "$campfire_large_tent", large_tent_crafting_hour, "${2}hour")
@@ -223,7 +273,15 @@ bool Function handle_page(string page)
             "$campfire_stone_arrow", stone_arrow_crafting_minute, "${0}min")
         misc_crafting_minute_id = mcm.addSliderOption( \
             "$campfire_misc", misc_crafting_minute, "${0}min")
+		
+		mcm.setCursorPosition(1)
+		mcm.addHeaderOption("$activities")
+		fire_building_minute_id = mcm.addSliderOption( \
+            "$campfire_fire_build", fire_building_minute, "${0}min")	
+		tent_pitching_minute_id = mcm.addSliderOption( \
+            "$campfire_tent_pitch", tent_pitching_minute, "${0}min")	
     endif
+
     return True
 EndFunction
 
@@ -263,6 +321,16 @@ bool Function handle_slider_opened(int option)
         mcm.setSliderDialogDefaultValue(15.0)
         mcm.setSliderDialogRange(0.0, 60.0)
         mcm.setSliderDialogInterval(1.0)
+	elseif option == fire_building_minute_id
+       mcm.setSliderDialogStartValue(fire_building_minute)
+       mcm.setSliderDialogDefaultValue(15.0)
+       mcm.setSliderDialogRange(0.0, 60.0)
+       mcm.setSliderDialogInterval(1.0)	
+	 elseif option == tent_pitching_minute_id
+       mcm.setSliderDialogStartValue(tent_pitching_minute)
+       mcm.setSliderDialogDefaultValue(15.0)
+       mcm.setSliderDialogRange(0.0, 60.0)
+       mcm.setSliderDialogInterval(1.0)	
     else
         return False
     endif
@@ -294,6 +362,12 @@ bool Function handle_slider_accepted(int option, float value)
     elseif option == misc_crafting_minute_id
         misc_crafting_minute = value
         mcm.setSliderOptionValue(misc_crafting_minute_id, value, "${0}min")
+	elseif option == fire_building_minute_id
+        fire_building_minute = value
+        mcm.setSliderOptionValue(fire_building_minute_id, value, "${0}min")
+	elseif option == tent_pitching_minute_id
+        tent_pitching_minute = value
+        mcm.setSliderOptionValue(tent_pitching_minute_id, value, "${0}min")			
     else
         return False
     endif
@@ -305,10 +379,13 @@ bool Function handle_option_highlighted(int option)
             option == large_tent_crafting_hour_id || \
             option == cooking_pot_crafting_hour_id || \
             option == stone_hatchet_crafting_minute_id || \
-            option == stone_arrow_crafting_minute_id
+            option == stone_arrow_crafting_minute_id || \
+			option == tent_pitching_minute_id
         mcm.setInfoText("$time_passed_performing_this_action")
     elseif option == misc_crafting_minute_id
         mcm.setInfoText("$campfire_misc_info")
+	elseif option == fire_building_minute_id
+		mcm.setInfoText("$campfire_fire_build_info")
     else
         return False
     endif
