@@ -8,6 +8,8 @@ float waterskin_crafting_hour
 int waterskin_crafting_hour_id
 float water_distilling_minute
 int water_distilling_minute_id
+float cooking_hour
+int cooking_hour_id
 Form waterskin
 Form[] saltwater
 
@@ -34,6 +36,7 @@ EndFunction
 Function load_defaults()
     waterskin_crafting_hour = 2.0
 	water_distilling_minute = 20.0
+    cooking_hour = 1.0
 EndFunction
 
 bool Function handle_added_item(Form item)
@@ -44,7 +47,7 @@ bool Function handle_added_item(Form item)
 	item_name = item.getName()		
 	main._debug("SunHelm Item - " + item_name)
 	
-	if item == waterskin
+	if (item == waterskin)
 		main._debug("SunHelm Waterskin made")
 		if waterskin_crafting_hour >= main.transition_threshold
 			main.Transition()
@@ -52,6 +55,14 @@ bool Function handle_added_item(Form item)
 		main.pass_time(waterskin_crafting_hour * \
 			main.random_time_multiplier() * \
 			self.main.expertise_multiplier("Smithing"))
+    elseif item.hasKeywordString("FrostfallWarmFoodDrinkKeyword")
+        main._debug("SunHelm Food Item Cooked")
+        if cooking_hour >= main.transition_threshold
+			main.Transition()
+		endif
+        main.pass_time(cooking_hour  * \
+            main.random_time_multiplier() * \
+            self.main.expertise_multiplier("Alchemy") / 60)
 	else
         main._debug("SunHelm misc item ignored")
 	endif		
@@ -76,6 +87,7 @@ EndFunction
 Function save_settings()
     mcm.fiss.saveFloat("sunhelm_waterskin_crafting_hour", waterskin_crafting_hour)
 	mcm.fiss.saveFloat("sunhelm_water_distilling_minute", water_distilling_minute)
+    mcm.fiss.saveFloat("sunhelm_cooking_hour", cooking_hour)
 EndFunction
 
 Function load_settings()
@@ -83,6 +95,7 @@ Function load_settings()
         "sunhelm_waterskin_crafting_hour")
 	water_distilling_minute = mcm.fiss.loadFloat( \
         "sunhelm_water_distilling_minute")
+    cooking_hour = mcm.fiss.loadFloat("sunhelm_cooking_hour")
 EndFunction
 
 bool Function handle_page(string page)
@@ -98,6 +111,8 @@ bool Function handle_page(string page)
         mcm.addHeaderOption("$crafting")
         waterskin_crafting_hour_id = mcm.addSliderOption( \
             "$sunhelm_waterskin", waterskin_crafting_hour, "${2}hour")
+        cooking_hour_id = mcm.addSliderOption( \
+            "$sunhelm_cooking", cooking_hour, "${1}hour")
 		
 		mcm.setCursorPosition(1)
 		mcm.addHeaderOption("$activities")
@@ -112,6 +127,11 @@ bool Function handle_slider_opened(int option)
         mcm.setSliderDialogStartValue(waterskin_crafting_hour)
         mcm.setSliderDialogDefaultValue(2.0)
         mcm.setSliderDialogRange(0.0, 8.0)
+        mcm.setSliderDialogInterval(0.25)
+    elseif option == cooking_hour_id
+        mcm.setSliderDialogStartValue(cooking_hour)
+        mcm.setSliderDialogDefaultValue(1.0)
+        mcm.setSliderDialogRange(0.0, 4.0)
         mcm.setSliderDialogInterval(0.25)
 	elseif option == water_distilling_minute_id
         mcm.setSliderDialogStartValue(water_distilling_minute)
@@ -128,6 +148,9 @@ bool Function handle_slider_accepted(int option, float value)
     if option == waterskin_crafting_hour_id
         waterskin_crafting_hour = value
         mcm.setSliderOptionValue(waterskin_crafting_hour_id, value, "${2}hour")
+    elseif option == cooking_hour_id
+        cooking_hour = value
+        mcm.setSliderOptionValue(cooking_hour_id, value, "${1}hour")
 	elseif option == water_distilling_minute_id
         water_distilling_minute = value
         mcm.setSliderOptionValue(water_distilling_minute_id, value, "${0}min")
@@ -139,6 +162,7 @@ EndFunction
 
 bool Function handle_option_highlighted(int option)
     if option == waterskin_crafting_hour_id || \
+            option == cooking_hour_id || \
 			option == water_distilling_minute_id
         mcm.setInfoText("$time_passed_performing_this_action")
     else
