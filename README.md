@@ -1,99 +1,140 @@
 ![Time Flies](./Pictures/time_flies.png)
 
-(Available on Nexus Mods: <http://www.nexusmods.com/skyrim/mods/74512>)
+# Time Flies VR
 
-## Description
-If you use basic needs mod like RND, iNeed or IMCN to enhance your gameplay,
-you may want a mod to make time pass when you perform actions like
-crafting, reading, eating etc. Then this might be the mod you're looking for.
+A Skyrim VR fork of [dfxyz's Time Flies SE](https://www.nexusmods.com/skyrimspecialedition/mods/39426),
+which is itself based on Akezhar's
+[Living Takes Time](http://www.nexusmods.com/skyrim/mods/44623/).
 
-This mod is based on Akezhar's
-[Living Takes Time](http://www.nexusmods.com/skyrim/mods/44623/). Since he's
-discontinuing the development of the mod and provides the source for anyone
-who wants to pick it up, feel free to to modify or redistribute this mod.
-No permission needed!
+Game time passes when you perform actions that ought to take a while — crafting,
+reading, looting, trading, eating, training, cooking, mining, chopping wood.
+Everything is configurable in MCM.
+
+## What this fork adds
+
+Time Flies SE detects "the player pressed Activate, a crafting menu may be about
+to open" through `OnKeyDown`. Skyrim VR has no keyboard input for that, so the
+crafting, fast-travel and interior/city tracking that hangs off it never fires.
+
+* **VR controller input.** `TimeFliesMain.OnVRButtonEvent` mirrors the existing
+  `OnKeyDown` logic using **Skyrim VR Tools** (CylonSurfer, Nexus/skyrimvr)
+  for its PapyrusVR API, listening for the A button and the trigger.
+* **SunHelm cooking.** A configurable time cost for cooking SunHelm food items,
+  with its own MCM slider on the SunHelm page.
+
+Forked from upstream 8.1.3. Grain-mill support and a handful of fixes have been
+picked up from upstream 8.2.2; the CACO waterskin/token form lists have not.
+See `.claude/docs/architecture.md` for what is and isn't merged.
 
 ## Requirements
-[SKSE](http://skse.silverlock.org/) and [SkyUI](http://www.nexusmods.com/skyrim/mods/3863/).
-And [FISS](http://www.nexusmods.com/skyrim/mods/48265/)
-if you want to save or load your own settings.
 
-Supported mods are **NOT REQUIRED** to run this mod.
-However, if you install any supported mod afterwards, you need to reinitialize
-Time Flies in MCM to make it recognize them.
+| | |
+|---|---|
+| Skyrim VR | the SE/AE build will not load this |
+| [SKSE VR](http://skse.silverlock.org/) | |
+| SkyUI VR | for the MCM |
+| **Skyrim VR Tools** (CylonSurfer, Nexus/skyrimvr) | provides `PapyrusVR` — **required**, unlike upstream |
+| [FISS](http://www.nexusmods.com/skyrim/mods/48265/) | optional, only to save/load your own settings presets |
+
+Supported mods are **not required**. If you install one after Time Flies, run
+*Reinitialize Time Flies* on the MCM's General page so it re-detects them.
 
 ## Features
-* Make game time pass when crafting, reading, looting, lockpicking, trading,
-  eating, training and learning spell. All configurable in MCM.
-* Crafting different items takes different amount of time.
-  Crafting takes time of an exact value or a random value within a range.
-* Reading increases speech skill based on time spent reading.
-* Hotkey to pause time passing function in special situations.
+
+* Time passes for crafting, smithing improvement, enchanting, alchemy, cooking,
+  reading, looting, lockpicking, trading, eating, training, learning spells,
+  harvesting, mining, lumbering, milling and skinning.
+* Per-item-type crafting times — helmets, cuirasses, gauntlets, boots, shields,
+  clothing, jewellery, each weapon class, ammo, staves, smelting and tanning are
+  all configured separately.
+* **Random crafting time** — each craft costs a random multiple of the configured
+  value (67%–100% by default) rather than a fixed amount.
+* **Expertise reduces time** — full time at skill 0, half time at skill 100.
+  Applies to reading, crafting, improving, enchanting, cooking and lockpicking.
+* **Item value modifies crafting time** — crafting times are normalised against
+  iron equipment and scale with item value up to a 4× cap at daedric.
+* Reading raises Speech based on time spent.
+* Optional fade-to-black transition for anything over a configurable threshold.
+* Optional combat lockout for menus, object activation and journal tabs.
+* Hotkey to pause and resume time passing.
+
+## Supported mods
+
+| Mod | Plugin |
+|---|---|
+| Hearthfire (DLC) | `HearthFires.esm` |
+| Anniversary Edition Fishing (CC) | `ccBGSSSE001-Fish.esm` |
+| Hearthfire Extended | `hearthfireextended.esp` |
+| Campfire | `Campfire.esm` |
+| Basic Camp Gear | `BasicCampGear.esp` |
+| Campsite | `Campsite.esp` |
+| iNeed | `iNeed.esp` |
+| SunHelm Survival | `SunHelmSurvival.esp` |
+| Last Seed | `LastSeed.esp` |
+| Skyrim Fishing | `BBD_SkyrimFishing.esp` |
+| Hunting in Skyrim | `Hunting in Skyrim.esp` |
+| Wounds | `Wounds.esp` |
+
+Shovels Bury Bodies, Pilgrim/Wintersun prayer, CACO, CCOR and Honed Metal are
+handled inside `TimeFliesMain` rather than as separate support scripts.
+
+`TF-AEFishing Patch.esp` is an optional ESL-flagged patch that adjusts the AE
+Fishing slaughterfish food record. It masters `ccBGSSSE001-Fish.esm`, so only
+enable it if you have the AE fishing content.
 
 ## Recommendations
-* `set timescale to 6` for more immersive experience.
-* Use time widget mods like [A Matter of Time](http://www.nexusmods.com/skyrim/mods/44091/).
-* Use [Complete Crafting Overhaul Remade](http://www.nexusmods.com/skyrim/mods/49791/)
-  for bulk production to save time.
 
-## Differences compared to Living Takes Time
-Like I said, this is a modified version of Living Takes Time.
-I removed some parts, added something new, and did refactoring with the others.
+* A lower `timescale` (6 or so) makes the whole thing feel less silly.
+* A time widget such as A Matter of Time.
+* Complete Crafting Overhaul Remastered for bulk production, so a stack of
+  arrows is one time cost rather than a hundred.
 
-Here is a list about differneces compared to Living Takes Time:
-* "Expertise reduces time" replaced by "Random crafting time"
-    * Life is more interesting with all the variables.
-    * Some items may belong to the same category,
-      that doesn't mean it takes the same time crafting them.
-    * When crafting, the time you spent may varies from x% to y% of
-      the value you set (by default that's 67% to 100%).
-* "Block x while in combat" removed
-    * It's a hardcore option and I may like it if
-      there is a better way to block menu opening than
-      closing them forcibly after player opening the menu.
-* "Crafting takes time" improved
-    * Clothes and armors crafting time can be configured separately now.
-    * Tanning and smelting time can be configured separately now.
-    * Misc items should be ignored in most situations for better compatibility.
-    * Also, something like cutting leather into strips
-      doesn't take "considerable" time.
-* "Hearthfire takes time" added
-    * Rome wasn't built in a day. So does your mansion.
-* "Level Up takes time", "Preparing takes time" removed
-    * I think those menus should be considered as time-pausing elements.
-* Some multipliers merged
-    * Looting time multiplier and pickpocket time multiplier merged.
-    * Barter time multiplier and gifting time multiplier merged.
+## Building
 
-## Known Issues
-There is a small chance that unnecessary time will pass
-when separating backpack or removing bed roll from tent.
+Requires the Papyrus compiler from the Skyrim SE Creation Kit. `skyrimse.ppj` is
+a [Pyro](https://github.com/fireundubh/pyro) project; the VS Code
+[papyrus-lang](https://marketplace.visualstudio.com/items?itemName=joelday.papyrus-lang-vscode)
+extension bundles Pyro and provides a build task.
 
-Currently I rely on item removing event to determine
-whether player is separating backpack or removing bed roll.
+```
+pyro --input-path skyrimse.ppj --game-path <path to a Skyrim install with a Papyrus Compiler folder>
+```
 
-However, when "crafting" those items,
-item removing event doesn't alway triggered before item adding event.
+Imports resolve against `Scripts/Source` and the game's `Data/Scripts/Source`,
+which must contain `PapyrusVR.psc` (Skyrim VR Tools) and `SKI_ConfigBase.psc`
+(SkyUI). Compiled `.pex` files are committed alongside their sources.
 
-Hence, there is no guarantee that Time Flies will work properly in these situations.
+See `.claude/docs/build-and-deploy.md` for the full setup, including what to do
+when no Creation Kit is installed.
 
-Set a pause hotkey if you need.
+## Known issues
+
+* Unnecessary time can pass when separating a backpack or removing a bedroll
+  from a tent. Detection relies on the item-removed event firing before the
+  item-added event, which is not guaranteed. Use the pause hotkey if it bites.
+* `handle_using_furniture` only sets the workstation flag if the crafting menu
+  is already open when `OnSit` fires. If the menu is slow, that craft costs
+  nothing. Unfixed, and inherited from upstream.
+* Support scripts detect their mod with `Game.GetModByName`, which returns 255
+  for ESL/ESPFE plugins. If a supported mod is light-flagged in your load order,
+  its support silently disables itself.
+* Debug tracing is always on (`debug_mode = True` in `TimeFliesMain` and
+  `TimeFliesMCM`). Useful for diagnosis, noisy in `Papyrus.0.log`.
 
 ## Credits
-All credits to Akezhar, the original Living Takes Time's author.
-I really enjoyed his mod for a long time.
 
-And to those who created mod-compatible versions of Living Takes Time
-(dragonsong, DrPastah, mlheur and anyone not mentioned).
-Haven't I tried those mods and read their source code,
-I won't realize that it's not difficult to customized Living Takes Time and
-then make this mod.
+All credit to Akezhar for Living Takes Time and to dfxyz for Time Flies SE —
+this fork is a thin VR layer over their work.
 
-Special thanks to sirtaj for his or her
-[vim-papyrus](https://github.com/sirtaj/vim-papyrus) plugin.
-I definitely won't make this mod with notepad. :D
+Also to dragonsong, DrPastah, mlheur and everyone else who built
+mod-compatible versions of Living Takes Time, and to CylonSurfer for
+Skyrim VR Tools.
 
-## Some Posters
+Original mod is distributed with no permissions required — modify and
+redistribute freely.
+
+## Posters
+
 ![Crafting Takes Time](./Pictures/crafting_takes_time.png)
 
 ![Reading Takes Time](./Pictures/reading_takes_time.png)
