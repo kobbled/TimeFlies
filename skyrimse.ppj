@@ -13,7 +13,7 @@
         <!-- Set the name of your mod: -->
         <Variable Name="ModName" Value="Time Flies SE" />
         <!-- The folder where you store all of your mods -->
-        <Variable Name="ModsFolder" Value="E:\games\MadGod-Skyrim\mods" />
+        <Variable Name="ModsFolder" Value="C:\FUS\mods" />
     </Variables>
     <Imports>
         <Import>C:\Users\mattp\Games\SkyrimVR\Data\Scripts\Source</Import>
