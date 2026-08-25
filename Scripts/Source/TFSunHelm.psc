@@ -60,9 +60,11 @@ bool Function handle_added_item(Form item)
         if cooking_hour >= main.transition_threshold
 			main.Transition()
 		endif
-        main.pass_time(cooking_hour  * \
+        ;; cooking_hour is in hours and pass_time() takes hours - the /60
+        ;; that used to be here turned the 1 hour default into 1 minute
+        main.pass_time(cooking_hour * \
             main.random_time_multiplier() * \
-            self.main.expertise_multiplier("Alchemy") / 60)
+            self.main.expertise_multiplier("Alchemy"))
 	else
         main._debug("SunHelm misc item ignored")
 	endif		

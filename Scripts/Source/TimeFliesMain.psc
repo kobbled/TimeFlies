@@ -93,6 +93,7 @@ float Property cooking_minute Auto
 float Property harvesting_minute Auto
 float Property mining_minute Auto
 float Property lumbering_minute Auto
+float Property milling_minute Auto
 bool Property skinning_enabled Auto
 float Property skinning_minute Auto
 float Property fire_building_minute Auto
@@ -152,6 +153,7 @@ Form[] Property frostbite Auto
 Form[] Property caco_items Auto
 Form Property milk Auto
 Form Property butter Auto
+Form Property flour Auto
 Form Property leather Auto
 Form Property firewood_campsite Auto
 
@@ -240,25 +242,74 @@ bool while_loop
 bool in_interior
 bool in_city
 bool fast_travel
+bool vr_registered					;; PapyrusVR button registration is live
+bool vr_handling					;; a VR press is already being processed
 
+;; PapyrusVR event types (see PapyrusVR.psc)
+int Property VR_PRESSED = 2 AutoReadOnly Hidden
+
+;; PapyrusVR button ids
+int Property VR_BUTTON_A = 7 AutoReadOnly Hidden
+int Property VR_BUTTON_TRIGGER = 33 AutoReadOnly Hidden
+
+
+;; PapyrusVR registrations do not survive a save/load, so init() is called
+;; from handle_loadgame() as well as from the MCM.
 Function init()
+	if vr_registered
+		return
+	endif
 	PapyrusVR.RegisterForVRButtonEvents(self)
-	_debug(" VR Buttons initailized")
+	vr_registered = True
+	_debug("VR buttons registered")
 EndFunction
 
 Function uninit()
+	if !vr_registered
+		return
+	endif
 	PapyrusVR.UnRegisterForVRButtonEvents(self)
-	_debug(" VR Buttons uninitialized")
+	vr_registered = False
+	vr_handling = False
+	_debug("VR buttons unregistered")
 EndFunction
 
 
 Event OnVRButtonEvent(int buttonEvent, int buttonId, int deviceId)
-	_debug("VR Keycode - device: " + deviceId + " button: " + buttonId + " event: " + buttonEvent)
+	;; PapyrusVR fires Touched/Untouched/Released for the same physical input,
+	;; so act on the press only - anything else multiplies the work below by four
+	if buttonEvent != VR_PRESSED
+		return
+	endif
+
+	if buttonId != VR_BUTTON_A && buttonId != VR_BUTTON_TRIGGER
+		return
+	endif
 
 	if !is_enabled || is_paused
 		return
 	endif
-		
+
+	;; the trigger doubles as attack, so ignore it with a weapon or spell out.
+	;; if your bindings activate with the trigger, drop this check.
+	if buttonId == VR_BUTTON_TRIGGER && Game.GetPlayer().IsWeaponDrawn()
+		return
+	endif
+
+	;; re-entering while a menu is already up misreads the press and clears the
+	;; crafting flags that handle_added_item() is about to check
+	if vr_handling \
+		|| Utility.IsInMenuMode() \
+		|| UI.isMenuOpen("Crafting Menu") \
+		|| UI.isMenuOpen("Dialogue Menu") \
+		|| UI.isMenuOpen("Console") \
+		|| Game.GetPlayer().IsInCombat()
+		return
+	endif
+
+	_debug("VR button pressed - device: " + deviceId + " button: " + buttonId)
+	vr_handling = True
+
 	if Game.GetPlayer().IsInInterior()
 		in_interior = True
 	else 
@@ -274,38 +325,33 @@ Event OnVRButtonEvent(int buttonEvent, int buttonId, int deviceId)
 	else
 		in_city = False
 	endif
-	
+
 	; crafting
-	if ((buttonId == 33 || buttonId == 7)) \
-		&& !(UI.isMenuOpen("Dialogue Menu")) \
-		&& !Game.GetPlayer().IsInCombat()
+	activate_key_pressed = True
+	Utility.Wait(2.0) ;; wait for possible open menu
 
-		    _debug("Wand: " + deviceId + " Button: " + buttonId)
-			_debug("Entering crafting menu")
-
-			activate_key_pressed = True
-			Utility.Wait(2.0) ;; wait for possible open menu
-			if UI.isMenuOpen("Crafting Menu") && furniture_using == None
-				_debug("Crafting via Menu")
-				is_crafting_menu = True
-				suppress_fullscreen = True
-			elseif !(Game.IsMovementControlsEnabled())
-				_debug("Possible fast travel")
-				fast_travel = True
-				game_time = Utility.GetCurrentGameTime()				
-				game_time_obtained = True
-				Utility.Wait(2.0) ;; wait for loot totals
-				GameTimeNotification()
-			else 
-				_debug("Not crafting or fast traveling")
-				is_crafting_menu = False
-				fast_travel = False
-				suppress_fullscreen = False
-			endif
-		
+	if UI.isMenuOpen("Crafting Menu") && furniture_using == None
+		_debug("Crafting via Menu")
+		is_crafting_menu = True
+		suppress_fullscreen = True
+	elseif UI.isMenuOpen("Crafting Menu")
+		;; a workstation opened it - handle_using_furniture() owns this one,
+		;; do not fall through and mistake it for a fast travel
+		_debug("Crafting via workstation, already tracked")
+	elseif !(Game.IsMovementControlsEnabled()) && !Utility.IsInMenuMode()
+		_debug("Possible fast travel")
+		fast_travel = True
+		game_time = Utility.GetCurrentGameTime()				
+		game_time_obtained = True
+		Utility.Wait(2.0) ;; wait for loot totals
+		GameTimeNotification()
+	else 
+		_debug("Not crafting or fast traveling")
 	endif
 
+	vr_handling = False
 EndEvent
+
 
 Event OnKeyDown(int keycode)
 
@@ -443,7 +489,6 @@ Event OnMenuOpen(string menu)
 		potion_mixed = Game.queryStat("Potions Mixed")
 		poison_mixed = Game.queryStat("Poisons Mixed")
 		unregisterForKey(37)
-		init()
 	
 	elseif menu == "Training Menu"
 		training_session = Game.queryStat("Training Sessions")
@@ -568,9 +613,7 @@ Event OnMenuClose(string menu)
 			time_stopped = Utility.getCurrentRealTime()
 			float time_passed = (time_stopped - time_started) * \
 				TimeScale.getValue() / 60 / 60 * trading_time_multiplier
-			pass_time(time_passed)
-			
-			uninit()														;; Trading	
+			pass_time(time_passed)														;; Trading	
 			return
 		endif
 		
@@ -578,8 +621,6 @@ Event OnMenuClose(string menu)
 			Transition()
 		endif	
 		pass_time(t)
-		
-		uninit()
 
 	elseif menu == "InventoryMenu"	
 		if eating_time_to_pass > 0.0
@@ -795,11 +836,22 @@ Function handle_loadgame()
 	loadgame = True
 	is_fishing = False
 	fast_travel = False
-	if show_day_notification
+
+	;; PapyrusVR registrations are not stored in the save, so whatever we
+	;; registered last session is gone - clear the flag so init() re-registers
+	vr_registered = False
+	vr_handling = False
+
+	if is_enabled && show_day_notification
 		int days_passed = GetPassedGameDays()
 		Utility.Wait(5.0)
 		Debug.Notification("Day " + days_passed)
 		time_advanced = False
+	endif
+
+	;; last, so a missing Skyrim VR Tools cannot take the rest of this with it
+	if is_enabled
+		init()
 	endif
 EndFunction
 
@@ -1028,11 +1080,16 @@ Function handle_added_item(Form item, int count, \
 		int potion_mixed_now = Game.queryStat("Potions Mixed")
 		int poison_mixed_now = Game.queryStat("Poisons Mixed")
 		
-        if p.isFood() 
+        if p.isFood()
+			if item == flour
+				_debug("Using grain mill")
+				pass_time(milling_minute * random_time_multiplier() / 60)
+			else
 				_debug("Cooking food")
 				cooking_time_to_pass += (cooking_minute * \
 					random_time_multiplier() * \
 					self.expertise_multiplier("Alchemy") / 60)
+			endif
 		elseif (potion_mixed_now > potion_mixed || poison_mixed_now > poison_mixed)
 				_debug("Crafting potions/poisons")
 				alchemy_time_to_pass += (alchemy_minute * \
@@ -1457,113 +1514,83 @@ float Function expertise_multiplier(string skill)
 EndFunction
 
 
+;; Scales crafting time between the iron baseline (1.0x) and the daedric
+;; baseline (4.0x). item_val is clamped into that range first: mod added gear
+;; priced at or above daedric used to produce a zero, negative or runaway
+;; multiplier, and a negative one made pass_time() bail out entirely so the
+;; craft cost no time at all.
+float Function value_ratio(float ival, float dval)
+	if dval <= ival
+		return 1.0
+	endif
+
+	float v = item_val
+	if v >= dval
+		return 4.0
+	elseif v < ival
+		v = ival
+	endif
+
+	float m = (dval - ival) / (dval - v)
+	if m > 4.0
+		m = 4.0
+	endif
+	return m
+EndFunction
+
+
 ;; Item value modifies crafting time
 float Function item_value_multiplier(Form item)
-	if item_value_time	
-		int type = item.getType()
-		if type == 26	;; armor
-			Armor a = item as Armor
-			if a.isHelmet()
-				if item_val == helm_dval
-					return 4.0
-				else
-					return (helm_dval - helm_ival) / (helm_dval - item_val)
-				endif
-			elseif a.isCuirass()
-				if item_val == cuirass_dval
-					return 4.0
-				else
-					return (cuirass_dval - cuirass_ival) / (cuirass_dval - item_val)
-				endif
-			elseif a.isGauntlets()
-				if item_val == gauntlets_dval
-					return 4.0
-				else
-					return (gauntlets_dval - gauntlets_ival) / (gauntlets_dval - item_val)
-				endif
-			elseif a.isBoots()
-				if item_val == boots_dval
-					return 4.0
-				else
-					return (boots_dval - boots_ival) / (boots_dval - item_val)
-				endif
-			elseif a.isShield()
-				if item_val == shield_dval
-					return 4.0
-				else
-					return (shield_dval - shield_ival) / (shield_dval - item_val)
-				endif
-			else
-				return 1.0
-			endif
-	
-		elseif type == 41	;; weapon
-			Weapon w = item as Weapon
-			if w.isBow()
-				if item_val == bow_dval
-					return 4.0
-				else
-					return (bow_dval - bow_ival) / (bow_dval - item_val)
-				endif
-			elseif w.IsDagger()
-				if item_val == dagger_dval
-					return 4.0
-				else
-					return (dagger_dval - dagger_ival) / (dagger_dval - item_val)
-				endif
-			elseif w.isSword()
-				if item_val == sword_dval
-					return 4.0
-				else
-					return (sword_dval - sword_ival) / (sword_dval - item_val)
-				endif
-			elseif w.isGreatSword()
-				if item_val == greatsword_dval
-					return 4.0
-				else
-					return (greatsword_dval - greatsword_ival) / (greatsword_dval - item_val)
-				endif
-			elseif w.isWarAxe()	
-				if item_val == waraxe_dval
-					return 4.0
-				else
-					return (waraxe_dval - waraxe_ival) / (waraxe_dval - item_val)
-				endif
-			elseif w.isBattleAxe()
-				if item_val == battleaxe_dval
-					return 4.0
-				else
-					return (battleaxe_dval - battleaxe_ival) / (battleaxe_dval - item_val)
-				endif
-			elseif w.isMace()
-				if item_val == mace_dval
-					return 4.0
-				else
-					return (mace_dval - mace_ival) / (mace_dval - item_val)
-				endif
-			elseif w.isWarhammer()
-				if item_val == warhammer_dval
-					return 4.0
-				else
-					return (warhammer_dval - warhammer_ival) / (warhammer_dval - item_val)
-				endif
-			else
-				return 1.0
-			endif
-					
-		elseif type == 42 ;; ammo
-			if item_val == ammo_dval
-					return 4.0
-			else
-				return (ammo_dval - ammo_ival) / (ammo_dval - item_val)
-			endif
-		else			
+	if !item_value_time
+		return 1.0
+	endif
+
+	int type = item.getType()
+
+	if type == 26	;; armor
+		Armor a = item as Armor
+		if a.isHelmet()
+			return value_ratio(helm_ival, helm_dval)
+		elseif a.isCuirass()
+			return value_ratio(cuirass_ival, cuirass_dval)
+		elseif a.isGauntlets()
+			return value_ratio(gauntlets_ival, gauntlets_dval)
+		elseif a.isBoots()
+			return value_ratio(boots_ival, boots_dval)
+		elseif a.isShield()
+			return value_ratio(shield_ival, shield_dval)
+		else
 			return 1.0
 		endif
-		
+
+	elseif type == 41	;; weapon
+		Weapon w = item as Weapon
+		if w.isBow()
+			return value_ratio(bow_ival, bow_dval)
+		elseif w.IsDagger()
+			return value_ratio(dagger_ival, dagger_dval)
+		elseif w.isSword()
+			return value_ratio(sword_ival, sword_dval)
+		elseif w.isGreatSword()
+			return value_ratio(greatsword_ival, greatsword_dval)
+		elseif w.isWarAxe()
+			return value_ratio(waraxe_ival, waraxe_dval)
+		elseif w.isBattleAxe()
+			return value_ratio(battleaxe_ival, battleaxe_dval)
+		elseif w.isMace()
+			return value_ratio(mace_ival, mace_dval)
+		elseif w.isWarhammer()
+			return value_ratio(warhammer_ival, warhammer_dval)
+		else
+			return 1.0
+		endif
+
+	elseif type == 42	;; ammo
+		return value_ratio(ammo_ival, ammo_dval)
+
 	else
 		return 1.0
-	endif 
+	endif
 EndFunction
 
 

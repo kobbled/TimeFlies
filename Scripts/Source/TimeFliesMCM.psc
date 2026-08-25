@@ -70,13 +70,15 @@ Function initialize()
 		register_hotkey()
 		registerForKey(18)	;; listener for key that may activate crafting menu
 		registerForKey(276)
-        
+
+		;; VR controller listener, needs Skyrim VR Tools (PapyrusVR)
+		main.init()
+
 		_debug("Initialized")
     else
         unregisterForAllMenus()
+        main.uninit()
     endif
-
-    main.init()
 	
 	;; Baseline iron crafting items
 	helm = Game.getFormFromFile(0x12e4d, "Skyrim.esm")
@@ -232,6 +234,7 @@ Function initialize()
 	
 	milk = Game.getFormFromFile(0x3534, "HearthFires.esm")
 	butter = Game.getFormFromFile(0x353C, "HearthFires.esm")
+	flour = Game.getFormFromFile(0x3538, "HearthFires.esm")
 	leather = Game.getFormFromFile(0xDB5D2, "Skyrim.esm")
 	firewood_campsite = Game.getFormFromFile(0x6F993, "Campsite.esp")
 	
@@ -242,6 +245,7 @@ Function initialize()
 	main.caco_items = caco_items
 	main.milk = milk
 	main.butter = butter
+	main.flour = flour
 	main.leather = leather
 	main.firewood_campsite = firewood_campsite
 			
@@ -315,6 +319,7 @@ Function load_defaults()
     main.cooking_minute = 15.0
 	main.harvesting_minute = 10.0
 	main.lumbering_minute = 10.0
+	main.milling_minute = 15.0
 	main.mining_minute = 30.0
 	main.skinning_minute = 10.0
 	
@@ -451,6 +456,7 @@ Function save_settings()
     fiss.saveFloat("cooking_minute", main.cooking_minute)
 	fiss.saveFloat("harvesting_minute", main.harvesting_minute)
 	fiss.saveFloat("lumbering_minute", main.lumbering_minute)
+	fiss.saveFloat("milling_minute", main.milling_minute)
 	fiss.saveFloat("mining_minute", main.mining_minute)
 	fiss.saveBool("skinning_enabled", main.skinning_enabled)
 	fiss.saveFloat("skinning_minute", main.skinning_minute)
@@ -542,6 +548,7 @@ Function load_settings()
     main.cooking_minute = fiss.loadFloat("cooking_minute")
 	main.harvesting_minute = fiss.loadFloat("harvesting_minute")
 	main.lumbering_minute = fiss.loadFloat("lumbering_minute")
+	main.milling_minute = fiss.loadFloat("milling_minute")
 	main.mining_minute = fiss.loadFloat("mining_minute")
 	main.skinning_enabled = fiss.loadFloat("skinning_enabled")
 	main.skinning_minute = fiss.loadFloat("skinning_minute")
@@ -626,6 +633,7 @@ int alchemy_minute_id
 int cooking_minute_id
 int harvesting_minute_id
 int lumbering_minute_id
+int milling_minute_id
 int mining_minute_id
 int skinning_enabled_id
 int skinning_minute_id
@@ -676,6 +684,7 @@ Form[] frostbite
 Form[] caco_items
 Form milk
 Form butter
+Form flour
 Form leather
 Form firewood_campsite
 
@@ -914,7 +923,9 @@ Event OnPageReset(string page)
 		harvesting_minute_id = addSliderOption( \
             "$harvesting", main.harvesting_minute, "${0}min")
 		lumbering_minute_id = addSliderOption( \
-            "$lumbering", main.lumbering_minute, "${0}min")			
+            "$lumbering", main.lumbering_minute, "${0}min")
+		milling_minute_id = addSliderOption( \
+            "$milling", main.milling_minute, "${0}min")
 		mining_minute_id = addSliderOption( \
             "$mining", main.mining_minute, "${0}min")
 			
@@ -1369,6 +1380,12 @@ Event OnOptionSliderOpen(int option)
         setSliderDialogDefaultValue(10.0)
         setSliderDialogRange(0.0, 30.0)
         setSliderDialogInterval(1.0)
+
+	elseif option == milling_minute_id
+        setSliderDialogStartValue(main.milling_minute)
+        setSliderDialogDefaultValue(15.0)
+        setSliderDialogRange(0.0, 60.0)
+        setSliderDialogInterval(1.0)
 				
 	elseif option == skinning_minute_id
         setSliderDialogStartValue(main.skinning_minute)
@@ -1562,6 +1579,10 @@ Event OnOptionSliderAccept(int option, float value)
 	elseif option == lumbering_minute_id
         main.lumbering_minute = value
         setSliderOptionValue(lumbering_minute_id, value, "${0}min") 
+
+	elseif option == milling_minute_id
+        main.milling_minute = value
+        setSliderOptionValue(milling_minute_id, value, "${0}min") 
 		
 	elseif option == skinning_minute_id
         main.skinning_minute = value
@@ -1700,6 +1721,7 @@ Event OnOptionHighlight(int option)
 			|| option == harvesting_minute_id \
 			|| option == mining_minute_id \
 			|| option == lumbering_minute_id \
+			|| option == milling_minute_id \
 			|| option == skinning_minute_id 
         setInfoText("$time_passed_performing_this_action")
 	elseif option == expertise_reduces_time_id
