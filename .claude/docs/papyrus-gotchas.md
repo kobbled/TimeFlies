@@ -30,8 +30,12 @@ valid Papyrus, so **the compiler will not catch it**.
 Build continuations with `chr(92)`, and check for flattening afterwards:
 
 ```bash
-awk 'length($0)>140 {print FILENAME":"NR}' Scripts/Source/*.psc
+awk 'length($0)>140 {print FILENAME":"FNR}' Scripts/Source/*.psc
 ```
+
+Use `FNR`, not `NR` — `NR` keeps counting across files and reports line numbers
+that do not exist in the file named. It is only a heuristic: a genuinely long
+single line trips it too, so eyeball each hit.
 
 ## Save-game compatibility
 
